@@ -55,6 +55,16 @@ h3{font:700 17px/1.3 var(--head);margin:0}
 .legend span{display:inline-flex;align-items:center;gap:8px}
 .legend i{width:11px;height:11px;border-radius:50%;display:inline-block}
 
+/* tab tài khoản */
+.accs{display:flex;gap:12px;flex-wrap:wrap;margin-top:26px}
+.acc{font:inherit;color:var(--ink);cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:2px;min-width:200px;padding:12px 18px;border-radius:14px;border:1px solid var(--line);background:linear-gradient(180deg,var(--cd2),var(--cd));box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 4px 0 var(--edge);transition:transform .08s,box-shadow .08s}
+.acc:active{transform:translateY(3px);box-shadow:0 1px 0 var(--edge)}
+.acc[aria-selected=true]{border-color:var(--gold);background:linear-gradient(180deg,#f8ebc4,#efd998);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 4px 0 var(--gold-d)}
+.acc b{font:700 15px var(--head);display:flex;align-items:center;gap:8px}
+.acc small{font-size:12px;color:var(--mu)}
+.acc .dot{flex:none}.acc.live .dot{background:var(--up);animation:pulse 2s ease-out infinite}.acc.off .dot{background:var(--dn)}
+.accinfo{margin:14px 0 0;font-size:13.5px;color:var(--mu)}
+.accinfo b{color:var(--ink)}
 /* kết quả */
 .res{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 .big{position:relative;overflow:hidden;padding:22px 24px}
@@ -139,6 +149,9 @@ footer{margin-top:34px;font-size:12.5px;color:var(--mu);max-width:80ch}
   </div>
 </div>
 
+<div class="accs" id="accs" role="tablist" aria-label="Chọn tài khoản"></div>
+<p class="accinfo" id="accInfo"></p>
+
 <section id="ketqua" aria-label="Kết quả giao dịch">
   <div class="res">
     <div class="slab big" data-tilt><span class="l" id="gL">Lãi / lỗ (%)</span><b class="num" id="gPct">–</b><small id="gDays"></small></div>
@@ -192,10 +205,13 @@ const CONFIG = {
   tagline: "Aria AI là bot giao dịch tự động trên MetaTrader 5 (Exness) cho vàng và Bitcoin. Mỗi lệnh đều được Aria AI thẩm định và phải qua các lớp kiểm soát rủi ro trước khi thực hiện. Mọi con số bên dưới đọc trực tiếp từ tài khoản thật.",
   telegram: "trieutrieu79",
   server: "https://ntfy.sh",             // Máy chủ ntfy
-  topic: "aurum-hedge-x7k29qpl4m81",     // Phải giống hệt topic mà bot/EA đẩy dữ liệu lên
+  // MỖI TÀI KHOẢN MỘT TOPIC RIÊNG. Thêm/bớt tài khoản bằng cách thêm/bớt dòng ở đây.
+  // topic phải giống hệt topic mà EA của tài khoản đó đẩy dữ liệu lên.
+  hub: "aurum-hub-CHANGE-ME-8h3k2m9x",   // Topic CHUNG: nhập giống hệt vào ô InpHubTopic của mọi EA
+  accounts: [],                          // (tùy chọn) khai tay thêm tài khoản: {key:"x",label:"Tên",topic:"..."}
   startBalance: 0,      // Vốn ban đầu (USD). Điền số để hiện cả % và USD khi dữ liệu chỉ có một loại. 0 = lấy từ dữ liệu
   refreshSec: 30,       // Trang tự đọc lại dữ liệu mỗi 30 giây
-  staleSec: 900,        // Quá 15 phút không có dữ liệu mới thì hiện "offline"
+  staleSec: 3600,       // Quá 60 phút không có dữ liệu mới thì hiện "offline" (phải lớn hơn InpHeartbeatSec của EA)
   flowIntro: "Quy trình này lặp lại cho từng lệnh, không bước nào bị bỏ qua.",
   steps: [
     ["Nhận diện cơ hội","Aria AI theo dõi thị trường trên khung thời gian bạn chọn."],
@@ -237,9 +253,8 @@ const CONFIG = {
 /* ======================== */
 
 const $=id=>document.getElementById(id);
-const TOPIC=new URLSearchParams(location.search).get('topic')||CONFIG.topic;
-const FEED=CONFIG.server.replace(/\/$/,'')+'/'+encodeURIComponent(TOPIC)+'/json?poll=1&since=latest';
-const CK='ariaAiCache', TG='https://t.me/'+CONFIG.telegram;
+const feedOf=a=>CONFIG.server.replace(/\/$/,'')+'/'+encodeURIComponent(a.topic)+'/json?poll=1&since=latest';
+const CK='ariaAiCache_', TG='https://t.me/'+CONFIG.telegram;
 const REDUCE=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const nf=(v,d=2)=>v.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
 const sg=(v,d=2)=>(v>=0?'+':'−')+nf(Math.abs(v),d);
@@ -400,6 +415,8 @@ function render(d,live){
   d.open=d.open||[];d.recent=d.recent||[];d.curve=d.curve||[];d.wins=d.wins||0;d.losses=d.losses||0;d.open_pl=d.open_pl||0;d.closed_pl=d.closed_pl||0;d.maxdd=d.maxdd||0;d.growth=d.growth||0;
   const n=d.wins+d.losses,wr=n?d.wins/n*100:0; curve=d.curve||[];
   SB=CONFIG.startBalance||d.start_balance||(d.balance&&d.growth>-100?d.balance/(1+d.growth/100):0)||0;
+  const idTxt=d.login||d.account||d.id;
+  $('accInfo').innerHTML=idTxt?`Đang xem: <b>${esc(CUR.label)}</b> · ID tài khoản <b>#${esc(idTxt)}</b>${d.server?' · '+esc(d.server):''}${d.currency?' · '+esc(d.currency):''}${d.mode?' · '+(d.mode==='demo'?'Demo':d.mode==='real'?'Thật':esc(d.mode)):''}`:`Đang xem: <b>${esc(CUR.label)}</b>`;
   const pill=$('status');pill.className='pill '+(live?'live':'off');
   $('statusTxt').textContent=live?'Đang chạy trực tiếp':'Bot offline, dữ liệu lúc '+new Date(d.updated*1000).toLocaleString('vi-VN');
 
@@ -428,22 +445,76 @@ function render(d,live){
   draw();
 }
 
-async function load(){
+/* nhiều tài khoản: mỗi tài khoản một topic, một bộ dữ liệu riêng */
+const STATE={};            // key -> {d, live, ok}
+let ACCOUNTS=[...CONFIG.accounts];
+try{const c=JSON.parse(localStorage.getItem('ariaHubList'));if(Array.isArray(c))c.forEach(a=>{if(!ACCOUNTS.some(x=>x.key===a.key))ACCOUNTS.push(a);});}catch(e){}
+let CUR=ACCOUNTS[0]||{key:'',label:'Chưa có tài khoản',topic:''};
+const urlAcc=new URLSearchParams(location.search).get('acc');
+const pickCur=()=>{const f=ACCOUNTS.find(a=>a.key===(CUR&&CUR.key))||ACCOUNTS.find(a=>a.key===urlAcc)||ACCOUNTS[0];if(f)CUR=f;};
+pickCur();
+
+/* tự dò tài khoản từ topic chung (mỗi EA tự đăng ký) */
+async function discover(){
+  if(!CONFIG.hub)return;
   try{
-    const r=await fetch(FEED,{cache:'no-store'});
+    const r=await fetch(CONFIG.server.replace(/\/$/,'')+'/'+encodeURIComponent(CONFIG.hub)+'/json?poll=1&since=12h',{cache:'no-store'});
+    if(!r.ok)throw new Error(r.status);
+    const msgs=(await r.text()).split('\n').filter(Boolean).map(l=>{try{return JSON.parse(l);}catch(_){return null;}}).filter(m=>m&&m.event==='message');
+    const byTopic={};
+    msgs.forEach(m=>{try{const h=JSON.parse(m.message);if(h&&h.hub&&h.topic)byTopic[h.topic+'|'+h.login]=h;}catch(_){}});
+    Object.values(byTopic).forEach(h=>{
+      const label=h.label||((h.mode==='demo'?'Demo':h.mode==='real'?'Thật':'Tài khoản')+(h.cent?' Cent':'')+' #'+h.login);
+      const a={key:'a'+h.login,label,topic:h.topic,login:h.login};
+      const i=ACCOUNTS.findIndex(x=>x.key===a.key);
+      if(i>=0)ACCOUNTS[i]=a;else ACCOUNTS.push(a);
+    });
+    try{localStorage.setItem('ariaHubList',JSON.stringify(ACCOUNTS.filter(a=>a.login)));}catch(e){}
+    pickCur();
+  }catch(e){}
+}
+
+function renderTabs(){
+  $('accs').innerHTML=ACCOUNTS.map(a=>{
+    const st=STATE[a.key],d=st&&st.d,id=d&&(d.login||d.account||d.id);
+    const state=!st?'':(st.live?'live':'off');
+    return `<button class="acc ${state}" role="tab" aria-selected="${a===CUR}" data-k="${a.key}"><b><span class="dot"></span>${esc(a.label)}</b><small>${id?'ID #'+esc(id)+' · ':''}${!st||!st.d?'Chưa có dữ liệu':(st.live?'Đang chạy':'Offline')}</small></button>`;
+  }).join('');
+}
+$('accs').addEventListener('click',e=>{
+  const b=e.target.closest('.acc');if(!b)return;
+  CUR=ACCOUNTS.find(a=>a.key===b.dataset.k);
+  history.replaceState(null,'','?acc='+CUR.key);
+  showCur();
+});
+function showCur(){
+  renderTabs();
+  const st=STATE[CUR.key];
+  if(st&&st.d)render(st.d,st.live);
+  else{$('accInfo').innerHTML=`Đang xem: <b>${esc(CUR.label)}</b>`;$('status').className='pill off';$('statusTxt').textContent='Chưa kết nối được tới bot';curve=[];draw();}
+}
+
+async function loadOne(a){
+  if(!a.topic)return;
+  try{
+    const r=await fetch(feedOf(a),{cache:'no-store'});
     if(!r.ok)throw new Error(r.status);
     const lines=(await r.text()).split('\n').filter(Boolean).map(l=>{try{return JSON.parse(l);}catch(_){return null;}}).filter(m=>m&&m.event==='message');
     if(!lines.length)throw new Error('empty');
     const d=JSON.parse(lines[lines.length-1].message);
-    try{localStorage.setItem(CK,JSON.stringify(d));}catch(e){}
-    render(d,(Date.now()/1000-d.updated)<CONFIG.staleSec);
+    try{localStorage.setItem(CK+a.key,JSON.stringify(d));}catch(e){}
+    STATE[a.key]={d,live:(Date.now()/1000-d.updated)<CONFIG.staleSec};
   }catch(e){
-    let c=null;try{c=JSON.parse(localStorage.getItem(CK));}catch(_){}
-    if(c)render(c,false);
-    else{$('status').className='pill off';$('statusTxt').textContent='Chưa kết nối được tới bot';draw();}
+    let c=null;try{c=JSON.parse(localStorage.getItem(CK+a.key));}catch(_){}
+    STATE[a.key]=c?{d:c,live:false}:(STATE[a.key]||{d:null,live:false});
   }
 }
-load();setInterval(load,CONFIG.refreshSec*1000);
+async function load(){
+  await discover();
+  await Promise.all(ACCOUNTS.map(loadOne));
+  showCur();
+}
+renderTabs();load();setInterval(load,CONFIG.refreshSec*1000);
 </script>
 </body>
 </html>
