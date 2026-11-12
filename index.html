@@ -505,10 +505,6 @@ html.mc .mclogo{border-radius:0;background:#ffa31a;color:#000}
     <div class="k" id="news" style="line-height:1.7"></div>
   </div>
 
-  <div class="card c8">
-    <div class="hd"><b>Nhật ký hoạt động</b></div>
-    <div class="term"><div class="tbar"><i></i><i></i><i></i><span>aria_decision.log</span></div><div class="log" id="log"></div></div>
-  </div>
 
   <div class="foot c12">Giao dịch có rủi ro mất vốn. Kết quả quá khứ không đảm bảo kết quả tương lai.</div>
 </div>
@@ -1060,10 +1056,6 @@ async function poll(){
       head.append(L,R);row.appendChild(head);const rb=rBar(p);if(rb)row.appendChild(rb);pos.appendChild(row)});
     const nw=$("news");nw.innerHTML="";(st.news||[]).forEach(e=>{nw.appendChild(el("div",null,e.t+" · "+e.cur+" · "+e.title))});
     if(!(st.news||[]).length)nw.textContent="Không có tin mạnh sắp tới (hoặc chưa tải được lịch).";
-    const lg=$("log");lg.innerHTML="";
-    st.log.forEach(e=>{const d=el("div"),key=e.t+e.tag+e.msg;if(logInit&&!seenLog.has(key))d.className="new";seenLog.add(key);
-      d.append(el("span","time",e.t),el("span","tag t-"+e.tag,e.tag),el("span",null,e.msg));lg.appendChild(d)});
-    logInit=true;if(seenLog.size>600)seenLog.clear();
   }catch(e){if(typeof viewerOff==="function")viewerOff();$("status").textContent="Mất kết nối bot";$("status").className="pill er"}
 }
 function tickClock(){
