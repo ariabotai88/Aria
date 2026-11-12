@@ -587,10 +587,15 @@ html.mc .mclogo{border-radius:0;background:#ffa31a;color:#000}
 </div>
 
 <script>
-// ====== CẤU HÌNH: dán link /state của máy chủ chỉ-xem (xem hướng dẫn) ======
-const ARIA_SRC="";   // ví dụ: "https://ten-ngau-nhien.trycloudflare.com/state"  (để trống = đọc ./state.json cùng thư mục)
-const DATA_URL=ARIA_SRC||"./state.json";
-
+// ====== CẤU HÌNH: điền "tên-github/tên-repo" của bạn (repo chứa file này) ======
+let GH_REPO="";        // để trống = tự nhận khi chạy trên GitHub Pages (tennguoi.github.io/tenrepo); hoặc điền tay: "nguyenvana/aria-bot"
+const GH_BRANCH="main";
+if(!GH_REPO&&/\.github\.io$/.test(location.hostname)){
+  const u=location.hostname.split(".")[0],r=location.pathname.split("/")[1];
+  GH_REPO=(r&&!/\.html?$/.test(r))?(u+"/"+r):(u+"/"+u+".github.io");   // trang gốc tennguoi.github.io -> repo tennguoi/tennguoi.github.io
+}
+const DATA_URL=GH_REPO?("https://raw.githubusercontent.com/"+GH_REPO+"/"+GH_BRANCH+"/state.json"):"./state.json";
+const POLL_MS=GH_REPO?15000:1500;
 const STEPS=[["timer","01","Hẹn giờ quét"],["guard","02","Lọc biến động"],["market","03","Dữ liệu giá"],["cache","04","Bộ nhớ tín hiệu"],["agent","05","Aria Agent"],["filter","06","Bộ lọc vào lệnh"],["gate","07","Kiểm soát rủi ro"],["exec","08","Đặt lệnh"],["manager","09","Quản lý lệnh"]];
 const ICON={timer:'<circle cx="12" cy="13" r="7"/><path d="M12 9v4l3 2M9 3h6"/>',guard:'<path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/>',market:'<path d="M7 4v16M12 7v11M17 3v14"/><rect x="5" y="9" width="4" height="6"/><rect x="10" y="10" width="4" height="5"/><rect x="15" y="6" width="4" height="6"/>',cache:'<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3 3 7 3s7-1.3 7-3v-6"/>',agent:'<rect x="4" y="6" width="16" height="13" rx="4"/><circle cx="9" cy="12" r="1.3"/><circle cx="15" cy="12" r="1.3"/><path d="M12 6V3M9 16h6"/>',filter:'<path d="M4 5h16l-6 8v6l-4-2v-4z"/>',gate:'<path d="M4 20V9l8-5 8 5v11M9 20v-6h6v6"/>',exec:'<path d="M5 12h13M13 6l6 6-6 6"/>',manager:'<path d="M5 7h14M5 12h14M5 17h14"/><circle cx="9" cy="7" r="2" fill="currentColor"/><circle cx="15" cy="12" r="2" fill="currentColor"/><circle cx="8" cy="17" r="2" fill="currentColor"/>'};
 const $=id=>document.getElementById(id);
@@ -1098,14 +1103,14 @@ function tfChange(){}
 setInterval(mcClock,500);
 
 setTheme("mc");
-poll();setInterval(poll,1500);setInterval(tickClock,500);
+poll();setInterval(poll,POLL_MS);setInterval(tickClock,500);
 </script>
 <script>
 function viewerClean(o){if(typeof o==="string")return o.replace(/</g,"\uFF1C");if(Array.isArray(o)){for(let i=0;i<o.length;i++)o[i]=viewerClean(o[i]);return o}
   if(o&&typeof o==="object"){for(const k in o)o[k]=viewerClean(o[k]);}return o}
 function viewerBan(t){const b=document.getElementById("vbanner");if(!b)return;if(t){b.textContent=t;b.style.display="block"}else b.style.display="none"}
-function viewerOk(s){viewerClean(s);const a=s._age;
-  if(a>45)viewerBan("⚠ Bot đang ngoại tuyến · dữ liệu cũ "+(a>=120?Math.round(a/60)+" phút":Math.round(a)+" giây"));else viewerBan("")}
+function viewerOk(s){viewerClean(s);const a=s._pub_ts?(Date.now()/1000-s._pub_ts):(s._age||0);
+  if(a>240)viewerBan("⚠ Bot đang ngoại tuyến · dữ liệu cũ "+(a>=120?Math.round(a/60)+" phút":Math.round(a)+" giây"));else viewerBan("")}
 function viewerOff(){viewerBan("⚠ Không kết nối được tới bot · đang thử lại…")}
 </script>
 <style>
